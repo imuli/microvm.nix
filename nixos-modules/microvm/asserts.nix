@@ -40,7 +40,7 @@ lib.mkIf config.microvm.guest.enable {
         '';
       }
       else {
-        assertion = bridge == null;
+        assertion = bridge == null || type == "tap";
         message = ''
           MicroVM ${hostName}: interface ${id} is not of type "bridge"
           and therefore shouldn't have a "bridge" option defined.
