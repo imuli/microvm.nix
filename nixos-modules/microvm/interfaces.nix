@@ -30,6 +30,9 @@ in
         ${lib.getExe' pkgs.iproute2 "ip"} tuntap add name '${id}' mode tap user '${user}' ${tapFlags}
         ${lib.getExe' pkgs.iproute2 "ip"} link set '${id}' up
       '' + (if bridge == null then "" else ''
+        if [ -f "/proc/sys/net/ipv6/conf/${id}/disable_ipv6" ]; then
+          echo 1 > "/proc/sys/net/ipv6/conf/${id}/disable_ipv6"
+        fi
         ${lib.getExe' pkgs.iproute2 "ip"} link set dev '${id}' master ${bridge}
       '') ) tapInterfaces;
 
