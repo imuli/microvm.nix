@@ -27,7 +27,7 @@ in
     system.activationScripts.microvm-host = ''
       mkdir -p ${stateDir}
       chown ${user}:${group} ${stateDir}
-      chmod g+w ${stateDir}
+      chmod u+rwx,g+w ${stateDir}
     '';
 
     environment.systemPackages = [
@@ -58,7 +58,9 @@ in
         isFlake = flake != null;
         guestConfig = if isFlake
                       then flake.nixosConfigurations.${name}.config
-                      else microvmConfig.config.config;
+                      else if microvmConfig.evaluatedConfig != null
+                        then microvmConfig.evaluatedConfig.config
+                        else microvmConfig.config.config;
         runner = guestConfig.microvm.declaredRunner;
       in
     {
@@ -72,9 +74,9 @@ in
         ];
         partOf = [ "microvm@${name}.service" ];
         wantedBy = [ "microvms.target" ];
-        # Only run this if the MicroVM is fully-declarative
-        # or /var/lib/microvms/$name does not exist yet.
-        unitConfig.ConditionPathExists = lib.mkIf isFlake "!${stateDir}/${name}";
+        # Run on every rebuild for fully-declarative MicroVMs and flake-based MicroVMs without updateFlake.
+        # For MicroVMs with updateFlake set, only run on initial installation.
+        unitConfig.ConditionPathExists = lib.mkIf (isFlake && updateFlake != null) "!${stateDir}/${name}";
         serviceConfig.Type = "oneshot";
         script = ''
             mkdir -p ${stateDir}/${name}
@@ -132,6 +134,7 @@ in
         description = "Setup MicroVM '%i' TAP interfaces";
         before = [ "microvm@%i.service" ];
         partOf = [ "microvm@%i.service" ];
+        after = [ "network.target" ];
         unitConfig.ConditionPathExists = "${stateDir}/%i/current/bin/tap-up";
         restartIfChanged = false;
         serviceConfig = {
@@ -197,7 +200,6 @@ in
           serviceConfig = {
             WorkingDirectory = "${stateDir}/%i";
             ExecStart = "${stateDir}/%i/current/bin/virtiofsd-run";
-            ExecReload = "${runFromBootedOrCurrent} virtiofsd-reload %i";
             ExecStop = "${runFromBootedOrCurrent} virtiofsd-shutdown %i";
             LimitNOFILE = 1048576;
             NotifyAccess = "all";
@@ -241,7 +243,7 @@ in
           WorkingDirectory = "${stateDir}/%i";
           ExecStart = "${stateDir}/%i/current/bin/microvm-run";
           ExecStop = "${stateDir}/%i/booted/bin/microvm-shutdown";
-          TimeoutSec = config.microvm.host.startupTimeout; 
+          TimeoutSec = config.microvm.host.startupTimeout;
           Restart = "always";
           RestartSec = "5s";
           User = user;

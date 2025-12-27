@@ -24,18 +24,18 @@ let
   kernelPath = {
     x86_64-linux = "${kernel.dev}/vmlinux";
     aarch64-linux = "${kernel.out}/${pkgs.stdenv.hostPlatform.linux-kernel.target}";
-  }.${pkgs.stdenv.system};
+  }.${pkgs.stdenv.hostPlatform.system};
 
   kernelConsoleDefault =
-    if pkgs.stdenv.system == "x86_64-linux"
+    if pkgs.stdenv.hostPlatform.system == "x86_64-linux"
     then "earlyprintk=ttyS0 console=ttyS0"
-    else if pkgs.stdenv.system == "aarch64-linux"
+    else if pkgs.stdenv.hostPlatform.system == "aarch64-linux"
     then "console=ttyAMA0"
     else "";
 
   kernelConsole = lib.optionalString (!hasUserSerial || userSerial == "tty") kernelConsoleDefault;
 
-  kernelCmdLine = "${kernelConsole} reboot=t panic=-1 ${builtins.unsafeDiscardStringContext (toString microvmConfig.kernelParams)}";
+  kernelCmdLine = "${kernelConsole} reboot=t panic=-1 ${toString microvmConfig.kernelParams}";
 
 
   userVSockOpts = (extractOptValues "--vsock" extraArgs).values;
@@ -139,7 +139,7 @@ let
     else
       lib.concatStringsSep "," (oemStringOptions ++ userPlatformOpts);
 in {
-  inherit tapMultiQueue;
+  inherit tapMultiQueue supportsNotifySocket;
 
   preStart = ''
     ${microvmConfig.preStart}

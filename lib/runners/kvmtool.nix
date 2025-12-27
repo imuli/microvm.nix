@@ -37,7 +37,7 @@ in {
         "--rng"
         "-k" (lib.escapeShellArg "${kernel}/${pkgs.stdenv.hostPlatform.linux-kernel.target}")
         "-i" initrdPath
-        "-p" (lib.escapeShellArg "console=ttyS0 reboot=k panic=1 ${builtins.unsafeDiscardStringContext (toString microvmConfig.kernelParams)}")
+        "-p" (lib.escapeShellArg "console=ttyS0 reboot=k panic=1 ${toString microvmConfig.kernelParams}")
       ]
       ++
       lib.optionals storeOnDisk [
@@ -59,9 +59,11 @@ in {
         ]
       ) volumes
       ++
-      builtins.concatMap ({ proto, source, tag, ... }:
+      builtins.concatMap ({ proto, source, tag, readOnly, ... }:
         if proto == "9p"
-        then [
+        then if readOnly then
+          throw "kvmtool does not support readonly 9p share"
+        else [
           "--9p" (lib.escapeShellArg "${source},${tag}")
         ] else throw "virtiofs shares not implemented for kvmtool"
       ) shares

@@ -6,7 +6,7 @@
 
 let
   inherit (pkgs) lib;
-  inherit (pkgs.stdenv) system;
+  inherit (pkgs.stdenv.hostPlatform) system;
   inherit (microvmConfig)
     vcpu mem balloon initialBalloonMem hotplugMem hotpluggedMem user volumes shares
     socket devices vsock graphics credentialFiles
@@ -61,7 +61,7 @@ in {
         "-m" (toString mem)
         "-c" (toString vcpu)
         "--serial" "type=stdout,console=true,stdin=true"
-        "-p" "console=ttyS0 reboot=k panic=1 ${builtins.unsafeDiscardStringContext (toString microvmConfig.kernelParams)}"
+        "-p" "console=ttyS0 reboot=k panic=1 ${toString microvmConfig.kernelParams}"
       ]
       ++
       lib.optional (!balloon) "--no-balloon"
@@ -100,11 +100,13 @@ in {
         ]
       ) volumes
       ++
-      builtins.concatMap ({ proto, tag, source, socket, ... }: {
+      builtins.concatMap ({ proto, tag, source, socket, readOnly, ... }: {
         "virtiofs" = [
           "--vhost-user" "type=fs,socket=${socket}"
         ];
-        "9p" = [
+        "9p" = if readOnly then
+          throw "Readonly 9p share is not supported"
+        else [
           "--shared-dir" "${source}:${tag}:type=p9"
         ];
       }.${proto}) shares
